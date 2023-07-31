@@ -1,47 +1,66 @@
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
-import Struct from './struct';
+import Struct from 'vuesp-struct';
+import AxiosDigestAuth from '@mhoc/axios-digest-auth';
+
+const fetch = digestAuth => ({
+  get: options => digestAuth.request({ ...options, method: 'GET' }),
+  post: options => digestAuth.request({ ...options, method: 'POST' }),
+});
 
 class Device extends EventEmitter {
+  #ip;
   #ws;
   #time;
+  #fetch;
+  #state;
+  #struct;
   #address;
   #options;
   #interval;
   #isConnect;
   #reconnectTime;
-  #struct;
 
-  constructor({ address = '', options = {}, reconnectTime = 15000 }) {
+  constructor({ ip, username = '', password = '', options = {}, reconnectTime = 15000 }) {
+    if (!ip) throw new TypeError("'ip' is required!");
     super();
+    this.#ip = ip;
     this.#ws = null;
     this.#struct = new Struct();
-    this.#struct.onInit = this.onInit.bind(this);
     this.#time = new Date();
-    this.#address = address;
+    this.#address = `ws://${ip}/esp`;
     this.#options = options;
     this.#interval = null;
     this.#reconnectTime = reconnectTime;
     this.#isConnect = false;
+    this.#fetch = fetch(new AxiosDigestAuth({ username, password }));
+    this.#state = {};
   }
 
-  onInit() {
-    this.send('INFO');
-    this.emit('init');
+  async onInit() {
+    try {
+      const { data } = await this.#fetch.get({ url: `http://${this.#ip}/struct.json` });
+      this.#struct.init(data);
+      this.emit('init', true);
+      this.send('INFO');
+    } catch (error) {
+      this.emit('error', error);
+      console.warn(error);
+    }
   }
 
   #onPing() {
     const delta = new Date().getTime() - this.#time;
     this.emit('ping', delta);
     this.#isConnect = delta < this.#reconnectTime;
-    console.log(delta);
+    // console.log(delta);
     if (delta > this.#reconnectTime) this.#onReconnect();
   }
 
   #onOpen(e) {
     this.#isConnect = true;
+    this.onInit();
     this.emit('open', e);
-    this.send('INIT');
   }
 
   #onMessage(message) {
@@ -52,6 +71,7 @@ class Device extends EventEmitter {
       if (data) {
         const { object, key } = data;
         if (key === 'PING') return;
+        this.#state[key] = object;
         this.emit('message', { object, key });
       }
     }
@@ -70,12 +90,16 @@ class Device extends EventEmitter {
   #onReconnect() {
     this.#time = new Date().getTime();
     console.log('onReconnect');
+    this.emit('reconnect');
     this.disconnect();
     this.connect();
   }
 
-  getSheme() {
-    return this.#struct.keys;
+  getStatus() {
+    return {
+      time: this.#time,
+      ip: this.#ip,
+    };
   }
 
   connect() {
@@ -89,6 +113,7 @@ class Device extends EventEmitter {
       if (!this.#interval) this.#interval = setInterval(this.#onPing.bind(this), 1000);
       return true;
     } catch (error) {
+      this.emit('error', error);
       console.error(error);
       return false;
     }
@@ -107,7 +132,7 @@ class Device extends EventEmitter {
     if (this.#isConnect) {
       const buffer = this.#struct.set(comm, data);
       if (buffer) {
-        console.log(this.#ws.send(buffer));
+        this.#ws.send(buffer);
         return true;
       }
       return false;

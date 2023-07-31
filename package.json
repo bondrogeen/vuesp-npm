@@ -1,6 +1,6 @@
 {
   "name": "vuesp-npm",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "vuesp esp",
   "main": "index.js",
   "scripts": {
@@ -11,7 +11,8 @@
   "author": "bondrogeen@gmail.com",
   "license": "MIT",
   "dependencies": {
-    "c-struct-to-json": "^1.0.0",
+    "@mhoc/axios-digest-auth": "^0.8.0",
+    "vuesp-struct": "^1.0.0",
     "ws": "^8.2.2"
   },
   "devDependencies": {

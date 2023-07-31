@@ -1,22 +1,28 @@
 import Device from './device';
 
-const client = new Device({ address: 'ws://192.168.10.17/esp' });
+const options = {
+  ip: '192.168.10.29',
+  username: 'admin',
+  password: 'admin',
+};
+
+const client = new Device(options);
 
 client.on('open', e => {
-  console.log(e);
-  setTimeout(() => {
-    client.send('SETTINGS');
-    console.log(client.getSheme());
-  }, 5000);
+  console.log(`open:`, e);
+});
+client.on('init', e => {
+  client.send('SETTINGS');
+  console.log(`init:`, e);
 });
 client.on('message', e => {
-  console.log(e);
+  console.log(`message:`, e);
 });
 client.on('close', e => {
-  console.log(e);
+  console.log(`close:`, e);
 });
 client.on('error', e => {
-  console.log(e);
+  console.log(`error:`, e);
 });
 
 client.connect();
