@@ -1,6 +1,6 @@
 {
   "name": "vuesp-npm",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "description": "vuesp esp",
   "main": "index.js",
   "scripts": {

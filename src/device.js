@@ -12,6 +12,7 @@ class Device extends EventEmitter {
   #ip;
   #ws;
   #time;
+  #name;
   #fetch;
   #state;
   #struct;
@@ -21,37 +22,49 @@ class Device extends EventEmitter {
   #isConnect;
   #reconnectTime;
 
-  constructor({ ip, username = '', password = '', options = {}, reconnectTime = 15000 }) {
+  constructor({ name = '', ip, username = '', password = '', options = {}, reconnectTime = 15000 }) {
     if (!ip) throw new TypeError("'ip' is required!");
     super();
     this.#ip = ip;
     this.#ws = null;
-    this.#struct = new Struct();
+    this.#name = name;
     this.#time = new Date();
+    this.#state = {};
+    this.#fetch = fetch(new AxiosDigestAuth({ username, password }));
+    this.#struct = new Struct();
     this.#address = `ws://${ip}/esp`;
     this.#options = options;
     this.#interval = null;
-    this.#reconnectTime = reconnectTime;
     this.#isConnect = false;
-    this.#fetch = fetch(new AxiosDigestAuth({ username, password }));
-    this.#state = {};
+    this.#reconnectTime = reconnectTime;
   }
 
   async onInit() {
     try {
       const { data } = await this.#fetch.get({ url: `http://${this.#ip}/struct.json` });
       this.#struct.init(data);
-      this.emit('init', true);
+      this.#onEvent('init', true);
       this.send('INFO');
     } catch (error) {
-      this.emit('error', error);
+      this.#onEvent('error', error);
       console.warn(error);
     }
   }
 
+  getInfo() {
+    const info = this.#state?.INFO || {};
+    return { ...info, name: this.#name, ip: this.#ip, time: this.#time };
+  }
+
+  #onEvent(event, data) {
+    const payload = { event, data, device: this.getInfo() };
+    this.emit(event, payload);
+    this.emit('*', payload);
+  }
+
   #onPing() {
     const delta = new Date().getTime() - this.#time;
-    this.emit('ping', delta);
+    this.#onEvent('ping', delta);
     this.#isConnect = delta < this.#reconnectTime;
     // console.log(delta);
     if (delta > this.#reconnectTime) this.#onReconnect();
@@ -60,26 +73,26 @@ class Device extends EventEmitter {
   #onOpen(e) {
     this.#isConnect = true;
     this.onInit();
-    this.emit('open', e);
+    this.#onEvent('open', e);
   }
 
   #onMessage(message) {
     this.#time = new Date().getTime();
-    this.emit('raw', message);
+    this.#onEvent('raw', message);
     if (message instanceof ArrayBuffer) {
       const data = this.#struct.get(message);
       if (data) {
         const { object, key } = data;
         if (key === 'PING') return;
         this.#state[key] = object;
-        this.emit('message', { object, key });
+        this.#onEvent('message', { object, key });
       }
     }
   }
 
   #onClose(e) {
     this.#isConnect = false;
-    this.emit('close', e);
+    this.#onEvent('close', e);
   }
 
   #onError() {
@@ -90,7 +103,7 @@ class Device extends EventEmitter {
   #onReconnect() {
     this.#time = new Date().getTime();
     console.log('onReconnect');
-    this.emit('reconnect');
+    this.#onEvent('reconnect');
     this.disconnect();
     this.connect();
   }
@@ -113,7 +126,7 @@ class Device extends EventEmitter {
       if (!this.#interval) this.#interval = setInterval(this.#onPing.bind(this), 1000);
       return true;
     } catch (error) {
-      this.emit('error', error);
+      this.#onEvent('error', error);
       console.error(error);
       return false;
     }
