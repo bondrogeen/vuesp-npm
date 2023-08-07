@@ -263,10 +263,13 @@ var Device = /*#__PURE__*/function (_EventEmitter) {
   return Device;
 }(_nodeEvents.EventEmitter);
 function _onEvent2(event, data) {
+  var device = this.getInfo();
+  var id = (device === null || device === void 0 ? void 0 : device.id) || 0;
   var payload = {
     event: event,
     data: data,
-    device: this.getInfo()
+    device: device,
+    id: id.toString(16)
   };
   this.emit(event, payload);
   this.emit('*', payload);

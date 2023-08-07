@@ -155,5 +155,5 @@ exports.VuespDevices = VuespDevices;
 function _onEvent2(payload) {
   var event = payload.event;
   this.emit(event, payload);
-  this.emit('*', payload);
+  if (event !== 'raw') this.emit('*', payload);
 }

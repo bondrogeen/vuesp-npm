@@ -16,7 +16,7 @@ class VuespDevices extends EventEmitter {
   #onEvent(payload) {
     const { event } = payload;
     this.emit(event, payload);
-    this.emit('*', payload);
+    if (event !== 'raw') this.emit('*', payload);
   }
 
   async init() {

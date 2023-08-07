@@ -57,7 +57,9 @@ class Device extends EventEmitter {
   }
 
   #onEvent(event, data) {
-    const payload = { event, data, device: this.getInfo() };
+    const device = this.getInfo();
+    const id = device?.id || 0;
+    const payload = { event, data, device, id: id.toString(16) };
     this.emit(event, payload);
     this.emit('*', payload);
   }
